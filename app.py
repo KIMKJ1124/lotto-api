@@ -1,25 +1,29 @@
+# app.py
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from lotto_utils import load_data, recommend_numbers
+from lotto_utils import load_data, recommend_numbers, ai_recommend
 
 app = Flask(__name__)
 CORS(app)
 
-# 루트 경로 응답용
 @app.route("/", methods=["GET"])
 def home():
     return "✅ Flask 앱이 작동 중입니다!"
 
-# 추천 번호 요청 처리
 @app.route("/api/recommend", methods=["GET"])
 def recommend():
     mode = request.args.get("mode", "proportional")
     sets = int(request.args.get("sets", 1))
 
-    data = load_data()
-    results = [recommend_numbers(data, proportional=(mode == "proportional")) for _ in range(sets)]
+    if mode == "ai":
+        result = ai_recommend(sets)
+    else:
+        data = load_data()
+        proportional = True if mode == "proportional" else False
+        result = [recommend_numbers(data, proportional) for _ in range(sets)]
 
-    return jsonify({"recommendations": results})
+    return jsonify({"recommendations": result})
 
 if __name__ == "__main__":
     import os
