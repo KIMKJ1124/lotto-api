@@ -5,11 +5,13 @@ from lotto_utils import load_data, recommend_numbers
 app = Flask(__name__)
 CORS(app)
 
-@app.route("/api/recommend", methods=["GET"])
+# 루트 경로 응답용
 @app.route("/", methods=["GET"])
 def home():
     return "✅ Flask 앱이 작동 중입니다!"
 
+# 추천 번호 요청 처리
+@app.route("/api/recommend", methods=["GET"])
 def recommend():
     mode = request.args.get("mode", "proportional")
     sets = int(request.args.get("sets", 1))
