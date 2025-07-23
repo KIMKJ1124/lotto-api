@@ -6,6 +6,10 @@ app = Flask(__name__)
 CORS(app)
 
 @app.route("/api/recommend", methods=["GET"])
+@app.route("/", methods=["GET"])
+def home():
+    return "✅ Flask 앱이 작동 중입니다!"
+
 def recommend():
     mode = request.args.get("mode", "proportional")
     sets = int(request.args.get("sets", 1))
