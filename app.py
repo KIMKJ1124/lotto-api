@@ -29,15 +29,6 @@ def init_data_async():
     finally:
         data_loading = False
 
-
-# -----------------------------
-# 🔹 Flask 시작 시 백그라운드 데이터 로드
-# -----------------------------
-@app.before_first_request
-def prepare_data():
-    Thread(target=init_data_async).start()
-
-
 # -----------------------------
 # 🔹 상태 확인용 엔드포인트
 # -----------------------------
@@ -48,14 +39,12 @@ def status():
         "data_loading": data_loading
     })
 
-
 # -----------------------------
 # 🔹 추천 API
 # -----------------------------
 @app.route("/api/recommend", methods=["GET"])
 def recommend_numbers():
     if not data_loaded:
-        # 로딩 중일 때는 503 반환
         return jsonify({
             "status": "loading",
             "message": "서버가 데이터를 불러오는 중입니다. 잠시 후 다시 시도해주세요."
@@ -76,7 +65,6 @@ def recommend_numbers():
             "message": str(e)
         }), 500
 
-
 # -----------------------------
 # 🔹 기본 라우트
 # -----------------------------
@@ -87,12 +75,11 @@ def home():
         "endpoints": ["/api/recommend", "/status"]
     })
 
-
 # -----------------------------
 # 🔹 Render 환경 포트 설정
 # -----------------------------
 if __name__ == "__main__":
     Thread(target=init_data_async).start()
-    port = int(os.environ.get("PORT", 10000))  # Render가 자동 할당하는 포트
+    port = int(os.environ.get("PORT", 10000))
     print(f"🚀 Flask server running on port {port}")
     app.run(host="0.0.0.0", port=port)
