@@ -33,7 +33,7 @@ def init_data_async():
 # -----------------------------
 # 🔹 Flask 시작 시 백그라운드 데이터 로드
 # -----------------------------
-@app.before_first_request
+@app.before_serving
 def prepare_data():
     Thread(target=init_data_async).start()
 
