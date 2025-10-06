@@ -1,136 +1,140 @@
-import pandas as pd
-import requests
 import os
+import time
+import requests
+import pandas as pd
 import random
-from sklearn.ensemble import RandomForestClassifier
 
-XLSX_FILE = "lotto_data.xlsx"
+DATA_FILE = "lotto_data.csv"
+BASE_URL = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber"
 
-# 🔍 최신 회차 번호 가져오기
+
+# ----------------------------------
+# 🔹 최신 회차 조회
+# ----------------------------------
 def get_latest_round():
-    for round_no in range(2000, 0, -1):
-        url = f"https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo={round_no}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("returnValue") == "success":
-                return round_no
-    return None
-
-# 📥 특정 범위 회차 수집
-def fetch_lotto_data(start=1, end=None):
-    if end is None:
-        end = get_latest_round()
-    if not end:
-        print("❌ 최신 회차 조회 실패")
-        return []
-
-    url = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber"
-    all_rounds = []
-
-    for round_no in range(start, end + 1):
-        response = requests.get(url, params={"drwNo": round_no})
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("returnValue") == "success":
-                all_rounds.append({
-                    "drwNo": data["drwNo"],
-                    "num1": data["drwtNo1"],
-                    "num2": data["drwtNo2"],
-                    "num3": data["drwtNo3"],
-                    "num4": data["drwtNo4"],
-                    "num5": data["drwtNo5"],
-                    "num6": data["drwtNo6"],
-                    "bonus": data["bnusNo"]
-                })
-                print(f"✅ {round_no}회차 저장 완료")
-            else:
-                print(f"⚠️ {round_no}회차 데이터 없음")
-
-    return all_rounds
-
-# 💾 데이터 저장
-def save_lotto_data(data):
-    df = pd.DataFrame(data)
-    df = df.drop_duplicates(subset=["drwNo"]).sort_values("drwNo")
-    df.to_excel(XLSX_FILE, index=False, engine="openpyxl")
-    print(f"💾 {XLSX_FILE} 저장 완료 (총 {len(df)} 회차)")
-
-# 📂 데이터 로딩
-def load_data():
-    if not os.path.exists(XLSX_FILE):
-        print("📁 데이터 파일 없음 → 전체 회차 수집 시작")
-        data = fetch_lotto_data()
-        if data:
-            save_lotto_data(data)
-    else:
-        df = pd.read_excel(XLSX_FILE, engine="openpyxl")
-        if "drwNo" not in df.columns:
-            print("❌ 'drwNo' 컬럼 없음 → 파일 재생성")
-            data = fetch_lotto_data()
-            if data:
-                save_lotto_data(data)
-        else:
-            latest_local = int(df["drwNo"].max())
-            latest_online = get_latest_round()
-            if latest_online and latest_local < latest_online:
-                print(f"📈 새로운 회차 발견: {latest_local+1} ~ {latest_online}")
-                new_data = fetch_lotto_data(start=latest_local + 1, end=latest_online)
-                if new_data:
-                    all_data = pd.concat([df, pd.DataFrame(new_data)], ignore_index=True)
-                    save_lotto_data(all_data.to_dict(orient="records"))
-
-    return pd.read_excel(XLSX_FILE, engine="openpyxl")
-
-# 🎲 번호 빈도 계산
-def calculate_frequency(df):
-    numbers = df[["num1", "num2", "num3", "num4", "num5", "num6"]].values.flatten()
-    freq = pd.Series(numbers).value_counts().to_dict()
-    return freq
-
-# 🎯 번호 추천 (비례/역비례)
-def recommend_numbers(df, proportional=True):
-    freq = calculate_frequency(df)
-    weighted = []
-
-    for num in range(1, 46):
-        count = freq.get(num, 0)
-        weight = count if proportional else (max(freq.values()) - count + 1)
-        weighted.extend([num] * weight)
-
-    if len(weighted) < 6:
-        return []
-    return sorted(random.sample(weighted, 6))
-
-# 🤖 AI 추천 모델 학습
-def train_rf_model(df):
-    if len(df) < 2:
-        raise ValueError("학습 데이터가 부족합니다. 최소 2개 이상의 회차가 필요합니다.")
-    X = df[["num1", "num2", "num3", "num4", "num5", "num6"]].iloc[:-1]
-    y = df[["num1", "num2", "num3", "num4", "num5", "num6"]].iloc[1:]
-    model = RandomForestClassifier(n_estimators=200, random_state=42)
-    model.fit(X, y)
-    return model
-
-# 🤖 AI 추천 실행
-def ai_recommend(sets=1):
-    df = load_data()
-    if len(df) < 2:
-        print("❌ AI 추천 불가: 데이터 부족")
-        return []
-
+    """9999 회차 요청을 통해 최신 회차 번호를 빠르게 확인"""
     try:
-        model = train_rf_model(df)
-        last = df[["num1", "num2", "num3", "num4", "num5", "num6"]].iloc[-1].values.reshape(1, -1)
-        predictions = model.predict(last)
-        result = []
-        for _ in range(sets):
-            pred = predictions[0]
-            if hasattr(pred, "tolist"):
-                result.append(sorted(pred.tolist()))
-            else:
-                result.append(sorted(list(pred)))
-        return result
+        url = f"{BASE_URL}&drwNo=9999"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("returnValue") == "success":
+                return data.get("drwNo")
+        return None
     except Exception as e:
-        print(f"❌ AI 추천 실패: {e}")
-        return []
+        print(f"❌ 최신 회차 조회 실패: {e}")
+        return None
+
+
+# ----------------------------------
+# 🔹 특정 회차 데이터 가져오기
+# ----------------------------------
+def get_round(round_no):
+    """지정된 회차의 로또 당첨 데이터를 반환"""
+    try:
+        url = f"{BASE_URL}&drwNo={round_no}"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("returnValue") == "success":
+                return {
+                    "drwNo": data["drwNo"],
+                    "drwtNo1": data["drwtNo1"],
+                    "drwtNo2": data["drwtNo2"],
+                    "drwtNo3": data["drwtNo3"],
+                    "drwtNo4": data["drwtNo4"],
+                    "drwtNo5": data["drwtNo5"],
+                    "drwtNo6": data["drwtNo6"],
+                    "bnusNo": data["bnusNo"],
+                }
+        return None
+    except Exception:
+        return None
+
+
+# ----------------------------------
+# 🔹 모든 회차 데이터 수집 및 저장
+# ----------------------------------
+def load_data(limit_rounds=200):
+    """
+    Render 환경에서는 전체 회차를 불러오면 메모리 초과 발생하므로
+    최신 회차부터 최근 limit_rounds 개만 수집
+    """
+    latest = get_latest_round()
+    if not latest:
+        print("❌ 최신 회차 조회 실패 - 데이터 로딩 중단")
+        return
+
+    print(f"📦 최신 회차: {latest}, 최근 {limit_rounds}회 수집 시작")
+
+    data = []
+    for round_no in range(latest, max(latest - limit_rounds, 0), -1):
+        round_data = get_round(round_no)
+        if round_data:
+            data.append(round_data)
+            print(f"✅ {round_no}회차 저장 완료")
+        time.sleep(0.1)  # 과도한 요청 방지 (100ms 대기)
+
+    if not data:
+        print("⚠️ 로드된 데이터 없음 - 중단")
+        return
+
+    df = pd.DataFrame(data)
+    df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
+    print(f"💾 {len(df)}개 회차 데이터 저장 완료 ({DATA_FILE})")
+
+
+# ----------------------------------
+# 🔹 데이터 불러오기
+# ----------------------------------
+def load_existing_data():
+    """이미 저장된 CSV 파일을 로드"""
+    if not os.path.exists(DATA_FILE):
+        print("⚠️ CSV 파일이 존재하지 않습니다.")
+        return None
+    try:
+        df = pd.read_csv(DATA_FILE)
+        return df
+    except Exception as e:
+        print(f"❌ CSV 파일 로드 실패: {e}")
+        return None
+
+
+# ----------------------------------
+# 🔹 추천번호 생성 로직
+# ----------------------------------
+def get_recommendations(mode="proportional", sets=5):
+    """
+    mode:
+      - proportional : 빈도 기반 가중치 추천
+      - random : 단순 랜덤
+    """
+    df = load_existing_data()
+    if df is None or df.empty:
+        raise ValueError("데이터가 로드되지 않았습니다.")
+
+    # 숫자별 등장 빈도 계산
+    numbers = pd.concat([
+        df["drwtNo1"], df["drwtNo2"], df["drwtNo3"],
+        df["drwtNo4"], df["drwtNo5"], df["drwtNo6"]
+    ])
+    freq = numbers.value_counts().sort_index()
+
+    all_numbers = list(range(1, 46))
+    weights = [freq.get(n, 1) for n in all_numbers]
+
+    results = []
+    for _ in range(sets):
+        if mode == "proportional":
+            # 빈도 기반 가중 랜덤 추출
+            picks = random.choices(all_numbers, weights=weights, k=6)
+            picks = sorted(list(set(picks)))  # 중복 제거
+            while len(picks) < 6:
+                picks.append(random.choice(all_numbers))
+                picks = sorted(list(set(picks)))
+        else:
+            # 완전 랜덤
+            picks = sorted(random.sample(all_numbers, 6))
+        results.append(picks)
+
+    return results
