@@ -92,6 +92,7 @@ def home():
 # 🔹 Render 환경 포트 설정
 # -----------------------------
 if __name__ == "__main__":
+    Thread(target=init_data_async).start()
     port = int(os.environ.get("PORT", 10000))  # Render가 자동 할당하는 포트
     print(f"🚀 Flask server running on port {port}")
     app.run(host="0.0.0.0", port=port)
