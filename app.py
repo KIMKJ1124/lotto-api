@@ -1,5 +1,3 @@
-# app.py
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from lotto_utils import load_data, recommend_numbers, ai_recommend
@@ -16,14 +14,18 @@ def recommend():
     mode = request.args.get("mode", "proportional")
     sets = int(request.args.get("sets", 1))
 
-    if mode == "ai":
-        result = ai_recommend(sets)
-    else:
-        data = load_data()
-        proportional = True if mode == "proportional" else False
-        result = [recommend_numbers(data, proportional) for _ in range(sets)]
+    try:
+        if mode == "ai":
+            result = ai_recommend(sets)
+        else:
+            data = load_data()
+            proportional = True if mode == "proportional" else False
+            result = [recommend_numbers(data, proportional) for _ in range(sets)]
 
-    return jsonify({"recommendations": result})
+        return jsonify({"recommendations": result})
+    except Exception as e:
+        print(f"❌ 추천 실패: {e}")
+        return jsonify({"error": "추천 중 오류가 발생했습니다."}), 500
 
 if __name__ == "__main__":
     import os
