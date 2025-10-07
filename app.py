@@ -75,6 +75,10 @@ def home():
         "endpoints": ["/api/recommend", "/status"]
     })
 
+@app.route("/ping")
+def ping():
+    return "pong", 200
+
 # -----------------------------
 # 🔹 Render 환경 포트 설정
 # -----------------------------
